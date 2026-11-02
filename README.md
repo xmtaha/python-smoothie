@@ -4,78 +4,67 @@
 
 Smoothie is a lightweight, secure, and high-performance Windows application that blends multiple internet connections (such as Wired Ethernet + Wi-Fi, or Ethernet + Mobile USB Tethering) together to share and maximize your aggregate network bandwidth across all active connections.
 
-This project was ported from the open-source [SethStalley/network-smoothie](https://github.com/SethStalley/network-smoothie) project and completely rewritten in Python by **Gemini 3.8 Flash**.
+This project is a pure-Python rewrite of the open-source [SethStalley/network-smoothie](https://github.com/SethStalley/network-smoothie) project (originally Node.js / Electron).
 
 ---
 
-## Why It Was Ported
+## Features
 
-The original application (SethStalley/network-smoothie) relied on Node.js, Electron, and an unmaintained CoffeeScript library (`dispatch-proxy`). During the codebase review, several critical architectural and stability flaws were identified:
-
-1. **Internet Lockout on Crashes:** If the application exited unexpectedly, the Windows system proxy remained enabled, completely severing internet connectivity across the entire host machine.
-2. **High Latency via PowerShell:** Proxy settings were refreshed by spawning `powershell.exe -ExecutionPolicy Bypass` on each toggle, adding a 2-3 second delay and triggering antivirus warnings.
-3. **IPv6 Link-Local Breakages:** The original network discovery loop did not distinguish between IPv4 and IPv6, often binding to link-local IPv6 addresses (`fe80::`) and breaking outbound TCP connections. Virtual adapters (Hyper-V, VirtualBox, WSL) were also left unfiltered.
-4. **Heavy Resource Footprint and Zombie Processes:** The app consumed 300+ MB of RAM due to Chromium/Electron, and frequently left orphan `Smoothie.exe` processes holding port 1080.
-5. **Connection Bottlenecks:** Parallel TCP streams in multi-threaded downloaders (Steam, Speedtest, IDM) suffered from Nagle-delayed ACKs and connection-distribution biases that caused speeds to drop to zero.
-
-To permanently resolve these issues, the application was re-architected from the ground up using pure Python standard libraries.
-
----
-
-## Technical Features and Recent Upgrades
-
-- **Ported by Gemini 3.8 Flash:** Completely reconstructed using modern Python 3 with zero required third-party packages.
 - **Tri-Hybrid Multi-Protocol Engine:** Operates simultaneously on a single port (`127.0.0.1:1080`), automatically detecting incoming traffic protocols:
   - **HTTP/HTTPS CONNECT Proxy:** Seamless support for Firefox, Edge, and general web browser HTTPS tunneling (`HTTP/1.1 200 Connection Established`).
   - **SOCKS5 Proxy:** Standard support for Chrome, Steam, Speedtest, Torrent clients, and games.
   - **SOCKS4/SOCKS4a Proxy:** Full fallback for legacy Windows utilities.
-- **Least-Connections Ratio Balancer with Round-Robin:**
-  - Evaluates active socket loads on each adapter in real time.
-  - Sockets are evenly distributed across all active connections (50% on Line 1, 50% on Line 2), allowing multi-connection engines (Steam, Speedtest, download managers) to achieve true aggregated speeds without throttling.
-- **Zero-Stall High-Throughput Tunneling:**
-  - `TCP_NODELAY` is enabled to eliminate Nagle latency.
-  - Socket buffers expanded to 256 KB.
-  - Rapid bidirectional stream shutdown prevents half-open socket stalling and zero-speed drops.
-- **Zero-Latency Windows C-API:** Registry settings are managed directly via `winreg`, while WinINet cache and option updates are committed instantly (0 ms) via `ctypes.windll.wininet.InternetSetOptionW`.
-- **Crash-Safe Guard and Diagnostic Logger:**
-  - Integrates `atexit` and OS signal handlers (`SIGINT`, `SIGTERM`). If the process terminates, Windows proxy settings are immediately restored to disabled.
-  - Global `sys.excepthook` writes unhandled errors to `smoothie.log` while automatically clearing proxy locks.
-- **Bilingual Interface (Turkish and English):** Real-time language switching button (`TR / EN`) in the GUI, with automatic system locale detection on startup.
-- **Resource Footprint:** Memory consumption reduced from ~300 MB down to ~35 MB.
+- **Least-Connections Balancer with Round-Robin tie-breaking:** Active socket loads on each adapter are evaluated in real time and streams are distributed evenly across all lines, allowing multi-connection applications (Steam, Speedtest, download managers) to use aggregated bandwidth.
+- **Zero-Stall High-Throughput Tunneling:** `TCP_NODELAY` enabled, 256 KB socket buffers, rapid bidirectional socket shutdown to avoid half-open stalls.
+- **Zero-Latency Windows C-API:** Registry settings are managed directly via `winreg`; WinINet option updates are applied instantly (0 ms) via `ctypes.windll.wininet.InternetSetOptionW` (no `powershell.exe` spawning).
+- **Proxy Ownership Safety:** Smoothie only touches the system proxy it set itself (`socks=127.0.0.1:1080`). If the system proxy is managed by another application, Smoothie warns and never overwrites or disables it. Leftover settings from a previous Smoothie session are cleaned up on startup.
+- **Crash-Safe Guard:** `atexit`, signal handlers (`SIGINT`, `SIGTERM`) and a global `sys.excepthook` make sure the proxy is only reverted when it actually belongs to Smoothie; unexpected errors are written to `smoothie.log`.
+- **Bilingual Interface (Turkish / English):** Real-time language switch button (`TR / EN`) with automatic system locale detection at startup.
+- **Zero Dependencies:** Pure Python 3 standard library; no third-party packages required for normal use.
 
 ---
 
-## System Comparison
+## Requirements
 
-| Criteria | Original Smoothie (Node.js / Electron) | Smoothie Python 2.0 (Gemini 3.8 Flash) |
-| :--- | :--- | :--- |
-| Upstream Source | SethStalley/network-smoothie | Ported by Gemini 3.8 Flash |
-| Language & Runtime | JavaScript / Node.js / Electron | Pure Python 3 (asyncio) |
-| Supported Protocols | SOCKS5 only | Tri-Hybrid (HTTP CONNECT + SOCKS5 + SOCKS4) |
-| Proxy Configuration | Spawns powershell.exe (slow, 2-3s delay) | ctypes WinINet C-API (instant, 0 ms) |
-| Crash Protection | None (Internet could be locked) | Crash-Safe Guard (atexit + signals + logger) |
-| Load Balancing | Simple priority calculation | Least-Connections + Round-Robin tie-breaker |
-| Adapter Filtering | All interfaces (IPv6 breakages) | Verified physical IPv4 with Default Gateway |
-| RAM Usage | ~300 MB | ~35 MB |
-| External Dependencies | Hundreds of MBs in node_modules | Zero (Python standard library only) |
+- Windows 10 / 11 (of any edition)
+- Python 3.10+ (only when running from source)
 
 ---
 
 ## How to Run
 
-### Graphical User Interface (GUI)
-Run the application directly via the Windows Python Launcher:
-```bash
-py python-smoothie/main.py
-```
-*(Optional language flag: `py python-smoothie/main.py --lang en`)*
+### Windows Executable (recommended)
 
-### Headless / Terminal Mode (CLI)
-To run the background proxy service without launching the GUI:
+Download `Smoothie.exe` from the project's GitHub Releases, place it in any folder, and run it by double-clicking. No Python installation required.
+
+- `Smoothie.exe` – Windowed application (GUI). Does not open a console window.
+- `SmoothieCLI.exe` – Console build for terminal/headless usage.
+
+Both support the CLI options below; the windowed build also accepts `--cli` to run headless (logs go to `smoothie.log` next to the EXE).
+
+### From Source
+
+Graphical User Interface (GUI):
 ```bash
-py python-smoothie/main.py --cli
+py main.py
 ```
-*(With language preference: `py python-smoothie/main.py --cli --lang en`)*
+Optional language flag: `py main.py --lang en`
+
+Headless / Terminal mode (CLI):
+```bash
+py main.py --cli
+```
+With language preference: `py main.py --cli --lang en`
+
+### Command Line Options
+
+| Option | Description | Default |
+| :--- | :--- | :--- |
+| `--cli` | Run in headless terminal mode without the GUI | disabled |
+| `--host` | Local proxy bind address | `127.0.0.1` |
+| `--port` | SOCKS5 proxy port | `1080` |
+| `--lang` | UI / CLI language (`tr` or `en`) | auto-detected |
+| `--version` | Print the version and exit | – |
 
 ---
 
@@ -89,37 +78,72 @@ Smoothie initializes a local multi-protocol proxy server on `127.0.0.1:1080`:
 
 ---
 
+## Running the Tests
+
+Offline unit tests (no internet, no registry changes — safe to run anywhere):
+```bash
+py -m unittest discover -s tests -v
+```
+
+`test_core.py` is a separate, manual **integration test** that requires real network adapters and internet access; run it only when at least two live connections are present:
+```bash
+py test_core.py
+```
+
+---
+
+## Troubleshooting
+
+- **"Port 1080 is being used by another application"** – Another program is listening on port 1080. Close that application or start Smoothie with a different port (`--port 1081` in CLI/EXE mode).
+- **"The system proxy is managed by another application"** – Windows proxy is currently controlled by another program (VPN, corporate proxy, etc.). Smoothie does not modify it; disable that proxy first, then start blending.
+- **Internet not restored after a crash?** Smoothie only reverts proxy settings it set itself. If the proxy was disabled by another tool, re-enable your usual settings manually.
+- Diagnostic logs are written to `smoothie.log` next to the executable / script.
+
+---
+
 ## Project Structure
 
 ```
-network-smoothie-main/
+python-smoothie/
 |-- README.md                  # English documentation
 |-- README.tr.md               # Turkish documentation
 |
-`-- python-smoothie/           # Python Application Package
-    |-- main.py                # Application entry point (GUI and CLI)
-    |-- requirements.txt       # Dependencies (zero required for normal use)
-    |-- test_core.py           # Integration and unit verification test
-    |-- smoothie.log           # Diagnostic crash and operation log
-    |
-    |-- core/
-    |   |-- i18n.py            # Bilingual translation dictionary (TR / EN)
-    |   |-- windows_proxy.py   # Registry & WinINet C-API controller
-    |   |-- network_detector.py# Adapter and default gateway discovery
-    |   `-- proxy_engine.py    # Tri-hybrid proxy & load balancing engine
-    |
-    `-- ui/
-        `-- gui.py             # Dark theme bilingual Tkinter interface
+|-- main.py                    # Application entry point (GUI and CLI)
+|-- test_core.py               # Manual integration test (needs live network)
+|-- smoothie.log               # Runtime diagnostic log (generated, not committed)
+|
+|-- core/
+|   |-- version.py             # Single source of truth for the app version
+|   |-- i18n.py                # Bilingual translation dictionary (TR / EN)
+|   |-- windows_proxy.py       # Ownership-safe Registry & WinINet C-API controller
+|   |-- network_detector.py    # Adapter and default gateway discovery
+|   `-- proxy_engine.py        # Tri-hybrid proxy & load balancing engine
+|
+|-- tests/                     # Offline unit tests (unittest, no internet needed)
+|   |-- test_engine_logic.py
+|   |-- test_engine_socks.py
+|   `-- test_windows_proxy.py
+|
+`-- ui/
+    `-- gui.py                 # Dark theme bilingual Tkinter interface
 ```
 
 ---
 
 ## Building a Standalone Executable (.exe)
 
-To bundle the application into a single executable that runs without Python installed:
+To bundle the application into executables that run without Python installed:
 
 ```bash
 py -m pip install pyinstaller
-pyinstaller --noconsole --onefile --name "Smoothie" python-smoothie/main.py
+py -m PyInstaller --noconsole --onefile --name "Smoothie" main.py
+py -m PyInstaller --onefile --name "SmoothieCLI" main.py
 ```
-The resulting executable will be located in the `dist/Smoothie.exe` directory.
+
+The resulting executables are located in the `dist/` directory. The build is reproducible; `build/`, `dist/` and the generated `.spec` file are not committed.
+
+---
+
+## License
+
+See [LICENSE](LICENSE).

@@ -21,10 +21,10 @@ class SmoothieApp:
     def __init__(self, root: tk.Tk, default_lang: str = None):
         self.root = root
 
-        # Sistem dilini otomatik tespit et
+        # Sistem dilini otomatik tespit et (getdefaultlocale deprecated; getlocale kullan)
         if not default_lang:
             try:
-                sys_lang = locale.getdefaultlocale()[0] or ""
+                sys_lang = locale.getlocale()[0] or ""
                 default_lang = "tr" if "tr" in sys_lang.lower() else "en"
             except Exception:
                 default_lang = "tr"
@@ -51,8 +51,12 @@ class SmoothieApp:
 
         self.is_running = False
 
-        # Baslangicta eski oturumdan kalan proxy varsa kapat (Crash-Safe)
-        if self.windows_proxy.is_proxy_currently_enabled_in_system():
+        # Baslangicta proxy sahipligi kontrolu (Crash-Safe):
+        # - Bizden kalan proxy varsa kapat (yalnizca ProxyServer bizi isaret ediyorsa yazar)
+        # - Baska uygulamaya ait proxy aciksa UYAR, kesinlikle dokunma
+        if self.windows_proxy.has_foreign_proxy():
+            messagebox.showwarning(self.i18n("warning_title"), self.i18n("warning_foreign_proxy"))
+        elif self.windows_proxy.is_proxy_currently_enabled_in_system():
             self.windows_proxy.disable_proxy()
 
         self._setup_styles()
@@ -347,6 +351,11 @@ class SmoothieApp:
             messagebox.showwarning(self.i18n("warning_title"), self.i18n("warning_no_adapter"))
             return
 
+        # Baska bir uygulamaya ait proxy aktifken baslatma
+        if self.windows_proxy.has_foreign_proxy():
+            messagebox.showwarning(self.i18n("warning_title"), self.i18n("warning_foreign_proxy"))
+            return
+
         try:
             self.proxy_engine.update_adapters(active_list)
             # Motorun tamamen basladigini bekle ve hata varsa yakala
@@ -356,14 +365,32 @@ class SmoothieApp:
             # Motor basariyla basladiysa Windows Proxy'sini ac; kayit yazilamazsa sessiz kalma
             if not self.windows_proxy.enable_proxy():
                 raise RuntimeError("Windows proxy kayitlari yazilamadi (registry error).")
-            self.windows_proxy.enable_proxy()
             self.is_running = True
             self._update_ui_state(running=True)
+        except OSError as e:
+            # 10048 (WSAEADDRINUSE): port baska bir surecte tarafindan kullaniliyor
+            port_busy = getattr(e, "winerror", None) == 10048 or e.errno in (48, 98, 10048)
+            self._abort_start(port_busy)
         except Exception as e:
-            messagebox.showerror(self.i18n("warning_title"), f"Proxy baslatilamadi:\n{e}")
-            self.windows_proxy.disable_proxy()
-            self.is_running = False
-            self._update_ui_state(running=False)
+            self._abort_start(False, str(e))
+
+    def _abort_start(self, port_busy: bool, detail: str = ""):
+        """Baslatma basarisiz: anlasilir mesaj göster, motoru ve (biz ise) proxy'yi temizle."""
+        try:
+            asyncio.run_coroutine_threadsafe(self.proxy_engine.stop(), self.loop).result(timeout=3.0)
+        except Exception:
+            pass
+        # disable_proxy yalnizca ProxyServer bizi isaret ediyorsa yazar
+        self.windows_proxy.disable_proxy()
+        if port_busy:
+            messagebox.showerror(self.i18n("warning_title"), self.i18n("error_port_in_use", port=self.proxy_engine.port))
+        else:
+            messagebox.showerror(
+                self.i18n("warning_title"),
+                self.i18n("error_start_failed") + (f"\n{detail}" if detail else ""),
+            )
+        self.is_running = False
+        self._update_ui_state(running=False)
 
     def _stop_service(self):
         try:

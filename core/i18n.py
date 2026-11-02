@@ -5,10 +5,12 @@ Smoothie için Türkçe ve İngilizce çoklu dil desteği sağlar.
 
 from typing import Dict
 
+from .version import __version__
+
 TRANSLATIONS: Dict[str, Dict[str, str]] = {
     "tr": {
         "app_title": "Smoothie - Ağ Birleştirici (Python)",
-        "badge_version": "PYTHON v2.0",
+        "badge_version": f"PYTHON v{__version__}",
         "status_off": "Ağ Birleştirme Kapalı",
         "status_on": "Ağlar Birleştirildi (Aktif)",
         "btn_start": "BİRLEŞTİRMEYİ BAŞLAT",
@@ -21,12 +23,15 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "footer_stats": "Toplam: {total} | Aktif Bağlantı: {active} | Toplam İstek: {reqs}",
         "warning_title": "Uyarı",
         "warning_no_adapter": "Lütfen en az bir aktif ağ hattı seçin!",
+        "error_start_failed": "Proxy başlatılamadı.",
+        "warning_foreign_proxy": "Sistem proxy'si başka bir uygulama tarafından yönetiliyor.\nSmoothie, proxy ayarlarınıza dokunmadı. Önce mevcut proxy'yi kapattığınızdan emin olun.",
+        "error_port_in_use": "Port {port} başka bir uygulama tarafından kullanılıyor. Diğer uygulamayı kapatın veya farklı bir port seçin.",
         "stats_format": "{size} | {count} istek",
         "lang_switch_btn": "EN",
     },
     "en": {
         "app_title": "Smoothie - Network Blender (Python)",
-        "badge_version": "PYTHON v2.0",
+        "badge_version": f"PYTHON v{__version__}",
         "status_off": "Network Blending Disabled",
         "status_on": "Networks Blended (Active)",
         "btn_start": "START BLENDING",
@@ -39,6 +44,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "footer_stats": "Total: {total} | Active Conns: {active} | Total Requests: {reqs}",
         "warning_title": "Warning",
         "warning_no_adapter": "Please select at least one active network adapter!",
+        "error_start_failed": "Failed to start the proxy.",
+        "warning_foreign_proxy": "The system proxy is managed by another application.\nSmoothie did not touch your proxy settings. Please make sure your existing proxy is disabled first.",
         "stats_format": "{size} | {count} reqs",
         "lang_switch_btn": "TR",
     },
