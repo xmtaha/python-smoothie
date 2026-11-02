@@ -1,0 +1,40 @@
+# Bağımlılıklar
+node_modules/
+
+# İşletim sistemi dosyaları
+.DS_Store
+Thumbs.db
+*.db
+
+# Python derleme / cache dosyalari
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Calisma zamanı loglari
+smoothie.log
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Derleme / dağıtım klasörleri (gerekirse kullanılabilir)
+dist/
+build/
+out/
+
+# Yerel ortam ve gizli dosyalar
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# CodeGraph ve Graphify
+.codegraph/
+graphify-out/

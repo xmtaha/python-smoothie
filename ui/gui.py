@@ -329,6 +329,11 @@ class SmoothieApp:
         active_list = [a for a in self.adapters if a.is_active]
         self.proxy_engine.update_adapters(active_list)
 
+        # Calisir durumdaki tum hatlarin secimini kaldirmak interneti kilitler
+        if self.is_running and not active_list:
+            self._stop_service()
+            messagebox.showwarning(self.i18n("warning_title"), self.i18n("warning_no_adapter"))
+
     def _toggle_bonding(self):
         """Ag birlestirmeyi baslatir veya durdurur."""
         if not self.is_running:
@@ -348,7 +353,9 @@ class SmoothieApp:
             future = asyncio.run_coroutine_threadsafe(self.proxy_engine.start(), self.loop)
             future.result(timeout=4.0)
 
-            # Motor basariyla basladiysa Windows Proxy'sini ac
+            # Motor basariyla basladiysa Windows Proxy'sini ac; kayit yazilamazsa sessiz kalma
+            if not self.windows_proxy.enable_proxy():
+                raise RuntimeError("Windows proxy kayitlari yazilamadi (registry error).")
             self.windows_proxy.enable_proxy()
             self.is_running = True
             self._update_ui_state(running=True)
